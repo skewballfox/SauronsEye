@@ -57,7 +57,7 @@ int main(void)
 
 		delta_frame=set_delta(average,gray_frame);
 
-		//contour_frame=set_contours();
+		contour_frame=set_contours(delta_frame);
 
 
 		//if the frame is empty break immediately
@@ -102,24 +102,19 @@ string NowToString()
 
 Mat set_delta(Mat &average, Mat gray_frame)
 {
-	Mat delta_frame;
+	Mat delta_frame, scaled_average;
+	//delta_frame is the storage for the difference between the accumulated average
+	//and the current gray frame. scaled average is for storing the output of convertScaleAbs()
+	//otherwise the depth of global average is 0 and causes an error on the second loop
 	if (average.empty()==1)
 	{
-		cout<<"gray frame depth: "<<gray_frame.depth();
-
 		gray_frame.convertTo(average, CV_32FC(gray_frame.channels()));
-		//Mat Acc(gray_frame.rows, gray_frame.cols,CV_32FC(gray_frame.channels()));
 	}
-	//cout<<"gray_frame average: "<< get_average(gray_frame)<<
-	//		"\naverage_frame average: "<<get_average(average);
-	Mat Acc(average.rows, average.cols,CV_32FC(average.channels()));
-
-	cout<<"average depth: "<<average.depth()<<"\nAcc depth: "<<Acc.depth();
-
 
 	accumulateWeighted(gray_frame, average, .5);
-	convertScaleAbs(average, average);
-	absdiff(gray_frame,average,delta_frame);
+	convertScaleAbs(average, scaled_average);
+	absdiff(gray_frame,scaled_average,delta_frame);
+
 	return delta_frame;
 }
 
