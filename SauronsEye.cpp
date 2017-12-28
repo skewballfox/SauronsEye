@@ -19,10 +19,15 @@
 using namespace std;
 using namespace cv;
 
+
+
+
 string NowToString();
 void display_information(Mat &frame, string room_status);
 Mat set_delta(Mat &average, Mat gray_frame);
-Mat set_contours(Mat delta_frame);
+vector<vector<Point> > set_contours(Mat delta_frame);
+void check_room_status(string &room_status, Mat &frame,vector<vector<Point> > contours);
+
 
 
 //for debugging
@@ -30,7 +35,7 @@ Scalar get_average(Mat array);
 
 int main(void)
 {
-	string room_status="Unoccupied";
+
 	Mat average;
 
 	VideoCapture feed(0);  //open the default camera
@@ -39,32 +44,38 @@ int main(void)
 
 	if (!feed.isOpened()) //check if we suceeded
 	{
-		cout << "we did it";
+
 		return -1;
 	}
 
 
 	while(1)
 	{
-		Mat frame, gray_frame, delta_frame, contour_frame; //Capture frame-by-frame
+		Mat frame, gray_frame, delta_frame; //Capture frame-by-frame
+
+		vector<vector<Point> > contours;
+		string room_status="Unoccupied";
 		feed >> frame;
-		//cout << "frame: \n" << frame<< endl;
+
 		cvtColor(frame,gray_frame, cv::COLOR_BGR2GRAY);
-		//cout << "frame: \n" << frame<< endl;
-		//cout<< "gray_frame: \n" <<gray_frame << endl;
+
 		GaussianBlur(gray_frame,gray_frame,Size(21,21),0);
-		//cout<< gray_frame << endl;
+
 
 		delta_frame=set_delta(average,gray_frame);
 
-		contour_frame=set_contours(delta_frame);
+
+
+
+		contours=set_contours(delta_frame);
+	    check_room_status(room_status,frame,contours);
 
 
 		//if the frame is empty break immediately
 		if (frame.empty())
 			break;
 		display_information(frame, room_status);
-		imshow("Frame", delta_frame);
+		imshow("Frame", frame);
 
 
 
@@ -115,23 +126,42 @@ Mat set_delta(Mat &average, Mat gray_frame)
 	convertScaleAbs(average, scaled_average);
 	absdiff(gray_frame,scaled_average,delta_frame);
 
+
 	return delta_frame;
 }
 
-Mat set_contours(Mat delta_frame)
+vector<vector<Point> > set_contours(Mat delta_frame)
 {
-	Mat thresh, cnts;
+	Mat thresh;
+	vector<vector<Point> > contours;
 	double delta_thresh=5;
 	double max_value=255;
-	cout << "pass 1\n";
-	threshold(delta_frame,thresh, delta_thresh,max_value,THRESH_BINARY);
-	cout << "average of thresh is: "<< get_average(thresh);
-	dilate(thresh, thresh,Mat(),Point(-1,-1),2);
-	cout << "pass 3\n";
-	findContours(thresh,(Mat(),cnts,Mat()),RETR_EXTERNAL,CHAIN_APPROX_SIMPLE,Point(0,0));
-	cout << "pass 4\n";
-    return cnts;
 
+	threshold(delta_frame,thresh, delta_thresh,max_value,THRESH_BINARY);
+
+	dilate(thresh, thresh,noArray(),Point(-1,-1),2);
+
+	findContours(thresh,contours,RETR_EXTERNAL,CHAIN_APPROX_SIMPLE);
+
+    return contours;
+
+}
+void check_room_status(string &room_status,Mat &frame, vector<vector <Point> > contours)
+{
+    for(int i =0;i<contours.size(); i++)
+    {
+        vector<Point> cnts=contours[i];
+    	if (contourArea(cnts)<5000)
+        	continue;
+        Rect rect=boundingRect(cnts);
+        Point pt1, pt2;
+        pt1.x = rect.x;
+        pt1.y = rect.y;
+        pt2.x = rect.x + rect.width;
+        pt2.y = rect.y + rect.height;
+        rectangle(frame, pt1, pt2, (0,255,0), 2);
+        room_status="Occupied";
+    }
 }
 Scalar get_average(Mat array)
 {
